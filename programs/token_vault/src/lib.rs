@@ -30,7 +30,6 @@ pub mod token_vault {
     }
 }
 
-// ── Exercise 2: custom error ──────────────────────────────────────────────────
 #[error_code]
 pub enum VaultError {
     #[msg("Vault is not empty. Withdraw all tokens before closing.")]
@@ -47,7 +46,6 @@ impl Space for VaultState {
     const INIT_SPACE: usize = 8 + 1 + 1;
 }
 
-// ── Exercise 1: seeds now include mint ───────────────────────────────────────
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -218,7 +216,6 @@ pub struct Close<'info> {
 
 impl<'info> Close<'info> {
     pub fn close(&mut self) -> Result<()> {
-        // Exercise 2: reject close if tokens remain
         require!(self.vault.amount == 0, VaultError::VaultNotEmpty);
 
         let seeds = &[

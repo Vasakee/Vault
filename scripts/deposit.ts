@@ -22,7 +22,6 @@ async function main() {
   const vault = getAssociatedTokenAddressSync(MINT, vaultState, true);
   const userAta = getAssociatedTokenAddressSync(MINT, user);
 
-  // Initialize vault (skip if already exists)
   try {
     await program.methods.initialize()
       .accounts({ mint: MINT, vault, vaultState, tokenProgram: TOKEN_PROGRAM_ID } as any)
@@ -32,7 +31,6 @@ async function main() {
     console.log("Vault already exists, skipping initialize");
   }
 
-  // Deposit
   const amount = new anchor.BN(DEPOSIT_AMOUNT * 10 ** 9);
   await program.methods.deposit(amount)
     .accounts({ mint: MINT, userAta, vault, vaultState, tokenProgram: TOKEN_PROGRAM_ID } as any)

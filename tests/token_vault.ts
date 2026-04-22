@@ -31,7 +31,6 @@ describe("token_vault", () => {
     userAta = ata.address;
     await mintTo(provider.connection, user.payer, mint, userAta, user.payer, 1_000_000_000);
 
-    // Exercise 1: seeds now include mint
     [vaultState] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("state"), user.publicKey.toBuffer(), mint.toBuffer()],
       program.programId
@@ -61,7 +60,6 @@ describe("token_vault", () => {
     assert.equal(acc.amount.toString(), "300000000");
   });
 
-  // Exercise 2: closing with a non-empty vault should fail
   it("close fails when vault is not empty", async () => {
     try {
       await program.methods.close()
