@@ -7,7 +7,7 @@ use anchor_spl::{
     },
 };
 
-declare_id!("8rs7LT66j549R2a7V16w32c2zvJ1YkFMW5vh5RDeyDgx");
+declare_id!("TokenVau1tProgramPubkeyReplace1111111111111");
 
 #[program]
 pub mod token_vault {
@@ -30,12 +30,7 @@ pub mod token_vault {
     }
 }
 
-#[error_code]
-pub enum VaultError {
-    #[msg("Vault is not empty. Withdraw all tokens before closing.")]
-    VaultNotEmpty,
-}
-
+// ---- STATE ----
 #[account]
 pub struct VaultState {
     pub vault_bump: u8,
@@ -46,7 +41,7 @@ impl Space for VaultState {
     const INIT_SPACE: usize = 8 + 1 + 1;
 }
 
-
+// ---- INITIALIZE ----
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
@@ -57,7 +52,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = user,
-        seeds = [b"state", user.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"state", user.key().as_ref()],
         bump,
         space = VaultState::INIT_SPACE,
     )]
@@ -85,6 +80,7 @@ impl<'info> Initialize<'info> {
     }
 }
 
+// ---- DEPOSIT ----
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
@@ -109,7 +105,7 @@ pub struct Deposit<'info> {
     pub vault: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        seeds = [b"state", user.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"state", user.key().as_ref()],
         bump = vault_state.state_bump,
     )]
     pub vault_state: Account<'info, VaultState>,
@@ -119,17 +115,19 @@ pub struct Deposit<'info> {
 
 impl<'info> Deposit<'info> {
     pub fn deposit(&mut self, amount: u64) -> Result<()> {
+        let cpi_program = self.token_program.to_account_info();
         let cpi_accounts = TransferChecked {
             from: self.user_ata.to_account_info(),
             to: self.vault.to_account_info(),
             authority: self.user.to_account_info(),
             mint: self.mint.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new(self.token_program.to_account_info(), cpi_accounts);
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         transfer_checked(cpi_ctx, amount, self.mint.decimals)
     }
 }
 
+// ---- WITHDRAW ----
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
     #[account(mut)]
@@ -154,7 +152,7 @@ pub struct Withdraw<'info> {
     pub vault: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        seeds = [b"state", user.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"state", user.key().as_ref()],
         bump = vault_state.state_bump,
     )]
     pub vault_state: Account<'info, VaultState>,
@@ -164,29 +162,25 @@ pub struct Withdraw<'info> {
 
 impl<'info> Withdraw<'info> {
     pub fn withdraw(&mut self, amount: u64) -> Result<()> {
-        let seeds = &[
-            b"state",
-            self.user.to_account_info().key.as_ref(),
-            self.mint.to_account_info().key.as_ref(),
-            &[self.vault_state.state_bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
+        let cpi_program = self.token_program.to_account_info();
         let cpi_accounts = TransferChecked {
             from: self.vault.to_account_info(),
             to: self.user_ata.to_account_info(),
             authority: self.vault_state.to_account_info(),
             mint: self.mint.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new_with_signer(
-            self.token_program.to_account_info(),
-            cpi_accounts,
-            signer_seeds,
-        );
+        let seeds = &[
+            b"state",
+            self.user.to_account_info().key.as_ref(),
+            &[self.vault_state.state_bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
         transfer_checked(cpi_ctx, amount, self.mint.decimals)
     }
 }
 
+// ---- CLOSE ----
 #[derive(Accounts)]
 pub struct Close<'info> {
     #[account(mut)]
@@ -204,7 +198,7 @@ pub struct Close<'info> {
 
     #[account(
         mut,
-        seeds = [b"state", user.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"state", user.key().as_ref()],
         bump = vault_state.state_bump,
         close = user,
     )]
@@ -216,21 +210,17 @@ pub struct Close<'info> {
 
 impl<'info> Close<'info> {
     pub fn close(&mut self) -> Result<()> {
-        require!(self.vault.amount == 0, VaultError::VaultNotEmpty);
-
-        let seeds = &[
-            b"state",
-            self.user.to_account_info().key.as_ref(),
-            self.mint.to_account_info().key.as_ref(),
-            &[self.vault_state.state_bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
         let cpi_accounts = CloseAccount {
             account: self.vault.to_account_info(),
             destination: self.user.to_account_info(),
             authority: self.vault_state.to_account_info(),
         };
+        let seeds = &[
+            b"state",
+            self.user.to_account_info().key.as_ref(),
+            &[self.vault_state.state_bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
         let cpi_ctx = CpiContext::new_with_signer(
             self.token_program.to_account_info(),
             cpi_accounts,
